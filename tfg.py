@@ -113,7 +113,7 @@ def pre_processing_FT():
 def pre_processing_without_fine_tunning():
 
   # complete test (ZERO-SHOT LEARNING & FINE TUNNING), with all the possible predictions
-  datadir = "/content/gdrive/MyDrive/TFG/data/test_p2"  #modificar depenent de la part que estem processant
+  datadir = "/content/gdrive/MyDrive/TFG/data/test"  #modificar depenent de la part que estem processant
   outfile = "/content/ZS_test_dataset.txt"
   nerc_sentences(datadir, outfile)
 
@@ -128,7 +128,7 @@ def pre_processing_without_fine_tunning():
   nerc_sentences(datadir, outfile)
 
   # Complete test (for avaluation), all the test with the validated results for the avaluation of all the methods
-  datadir = "/content/gdrive/MyDrive/TFG/data/test_p2" #modificar depenent de la part que estem processant
+  datadir = "/content/gdrive/MyDrive/TFG/data/test" #modificar depenent de la part que estem processant
   outfile = "/content/full_test_dataset.txt"
   nerc_full_with_marks(datadir, outfile)
 
@@ -444,7 +444,7 @@ def load_predicted_and_expected_data():
 
   print(expected_dataset)
 
-  predicted_path = "/content/gdrive/MyDrive/TFG/generated_text_FT_few_small_p2.txt"
+  predicted_path = "/content/gdrive/MyDrive/TFG/generated_text_FS.txt"
 
   predicted_dataset = []
 
@@ -484,60 +484,117 @@ def pre_process_predicted_and_expected_data(predicted_dataset, expected_dataset)
   calcule_results(responses_expected_dataset, responses_predicted_dataset)
 
 def calcule_results(responses_expected_dataset, responses_predicted_dataset):
-  COR = 0 # correct answers
-  POS = 0 # possible answers
-  ACT = 0 # actual answers
+  # Inicialitzar contadors per cada categoria
+  COR_group, POS_group, ACT_group = 0, 0, 0  # GROUP
+  COR_drug, POS_drug, ACT_drug = 0, 0, 0  # DRUG
+  COR_drug_n, POS_drug_n, ACT_drug_n = 0, 0, 0  # DRUG_N
+  COR_brand, POS_brand, ACT_brand = 0, 0, 0  # BRAND
 
-
+  #str1 es exp i str2 es pred
   for str1, str2 in zip(responses_expected_dataset, responses_predicted_dataset):
     patron = re.compile(r'<(group|drug|drug_n|brand)>(.*?)</\1>')
 
     coincidencias1 = patron.findall(str1)
     coincidencias2 = patron.findall(str2)
 
-    POS += len(coincidencias1)
-    ACT += len(coincidencias2)
+    for (tag, _) in coincidencias1:
+        if tag == 'group':
+          POS_group += 1
+        elif tag == 'drug':
+          POS_drug += 1
+        elif tag == 'drug_n':
+          POS_drug_n += 1
+        else:
+          POS_brand += 1
 
-    correct = 0
+    for (tag, _) in coincidencias2:
+        if tag == 'group':
+          ACT_group += 1
+        elif tag == 'drug':
+          ACT_drug += 1
+        elif tag == 'drug_n':
+          ACT_drug_n += 1
+        else:
+          ACT_brand += 1
+
+
+    correct_group, correct_drug, correct_drug_n, correct_brand = 0, 0, 0, 0
 
     # predicted
     for i in range(len(coincidencias2)):
-        a = coincidencias2[i]
-
+        a_category, a = coincidencias2[i]
         # expected
-        for j in range(len(coincidencias1)):
-            b = coincidencias1[j]
+        for j, (b_category, b) in enumerate(coincidencias1):
+          if a == b and a_category == b_category:
+            if a_category == 'group':
+              correct_group += 1
+            elif a_category == 'drug':
+              correct_drug += 1
+            elif a_category == 'drug_n':
+              correct_drug_n += 1
+            elif a_category == 'brand':
+              correct_brand += 1
 
-            if a == b:
-                correct += 1
-                coincidencias1.pop(j)
-                break
+            coincidencias1.pop(j)
+            break
 
-    COR += correct
-  print("POS: ")
-  print(POS)
-  print("ACT: ")
-  print(ACT)
-  print("COR: ")
-  print(COR)
-  #evaluadors(COR,ACT,POS) a les subparts no ho executem fins al final
+
+
+    COR_group += correct_group
+    COR_drug += correct_drug
+    COR_drug_n += correct_drug_n
+    COR_brand += correct_brand
+
+
+
+  print("group:")
+  evaluadors(COR_group, ACT_group, POS_group) # a les subparts no ho executem fins al final
+  print("drug:")
+  evaluadors(COR_drug, ACT_drug, POS_drug)
+  print("drug_n:")
+  evaluadors(COR_drug_n, ACT_drug_n, POS_drug_n)
+  print("brand:")
+  evaluadors(COR_brand, ACT_brand, POS_brand)
 
 def evaluadors(COR,ACT,POS):
-  # Precisio ->
-  P = COR/ACT
+  # Falsos positius ->
+  fp = ACT - COR
 
-  # Recall ->
-  R = COR/POS
+  # Falsos negatius ->
+  fn = POS - COR
 
-  # F1-score ->
-  F1 = (2*P*R) / (P+R)
+  print("tp:")
+  print(COR)
+  print("fp:")
+  print(fp)
+  print("fn:")
+  print(fn)
+  print("#pred:")
+  print(ACT)
+  print("#exp:")
+  print(POS)
 
-  print("P: ")
-  print(P)
-  print("R: ")
-  print(R)
-  print("F1: ")
-  print(F1)
+  if ACT > 0:
+    # Precisio ->
+    P = COR/ACT
+    print("P: ")
+    print(P)
+  else:
+    P = 0
+
+  if POS > 0:
+    # Recall ->
+    R = COR/POS
+    print("R: ")
+    print(R)
+  else:
+    R = 0
+
+  if P > 0 and R > 0:
+    # F1-score ->
+    F1 = (2*P*R) / (P+R)
+    print("F1: ")
+    print(F1)
 
 """#MAIN"""
 
@@ -565,7 +622,7 @@ pre_processing_without_fine_tunning()
 full_prompt = "For each of the following sentences, mark in XML which are the mentioned drugs and their type(drug, group, brand, drug not usable on humans)."
 
 ## ZSL & FT
-zero_shot_learning('/content/gdrive/MyDrive/TFG/gpt2-small-FT-few-pharma')
+zero_shot_learning('/content/gdrive/MyDrive/TFG/gpt2-pharma')
 
 ## FSL
 few_shot_learning('/content/gdrive/MyDrive/TFG/gpt2-pharma')
